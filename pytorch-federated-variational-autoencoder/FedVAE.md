@@ -6,7 +6,7 @@ O objetivo desse documento é descrever os códigos que realizam um treinamento 
 
 ## Cliente
 
-```
+```python
 """fedvaeexample: A Flower / PyTorch app for Federated Variational Autoencoder."""
 
 import torch
@@ -62,6 +62,9 @@ def client_fn(context: Context):
 app = ClientApp(client_fn=client_fn)
 
 ```
+
+## Servidor
+
 
 
 
