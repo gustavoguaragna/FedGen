@@ -4,7 +4,14 @@ O objetivo desse documento é descrever os códigos que realizam um treinamento 
 
 ![Estrutura VAE](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/VAE.png "VAE")
 
-## Cliente
+## Estrutura do projeto
+- Arquivo de configuração: pyproject.toml
+- Arquivo de funções auxiliares: task.py
+- Arquivo do cliente: client_app.py
+- Arquivo do servidor: server_app.py
+
+
+## Arquivo de Configuração 
 
 ```python
 """fedvaeexample: A Flower / PyTorch app for Federated Variational Autoencoder."""
