@@ -25,10 +25,9 @@ serverapp = "fedvaeexample.server_app:app"
 clientapp = "fedvaeexample.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 5
-local-epochs = 2
+num-server-rounds = 3
+local-epochs = 1
 learning-rate = 0.001
-dataset = "mnist"  # Alterar para "cifar10" conforme necessário
 
 [tool.flwr.federations]
 default = "local-simulation"
