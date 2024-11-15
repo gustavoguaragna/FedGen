@@ -67,7 +67,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 ```
-Classes para o modelo. Flatten será usada no Encoder para vetorizar a entrada em uma dimensão, enquando UnFlatten será usada no Decoder para reformatar conforme o tamanho desejado. O modelo
+##### Classes para o modelo. 
+Flatten será usada no encoder para vetorizar a entrada em uma dimensão, enquando UnFlatten será usada no decoder para reformatar conforme o tamanho desejado. O encoder é composto por duas redes convolucionais seguidas de ativações ReLU e pela camada Flatten ao fim. Já o decoder é composto pela camada UnFlatten e por duas redes convolucionais transpostas seguidas das ativações ReLU e tangente hiberbólica. A cada passagem de foward propagation a imagem de entrada passa pelo encoder, que retorna a média, o desvio padrão de uma distribuição no espaço latente, assim como uma amostra dessa distribuição. Essa amostra passa pelo decoder que retorna a imagem sintética no formato original da imagem de entrada.
 
 ```python
 class Flatten(nn.Module):
@@ -136,9 +137,11 @@ class Net(nn.Module):
         z_decode = self.decode(z)
         return z_decode, mu, logvar
 
+```
+A função _load_data_ é responsável por carregar os dados do CIFAR10, dividí-los entre os clientes e pré-processá-los.
 
+```python
 fds = None  # Cache FederatedDataset
-
 
 def load_data(partition_id, num_partitions):
     """Load partition CIFAR10 data."""
@@ -166,8 +169,13 @@ def load_data(partition_id, num_partitions):
     trainloader = DataLoader(partition_train_test["train"], batch_size=32, shuffle=True)
     testloader = DataLoader(partition_train_test["test"], batch_size=32)
     return trainloader, testloader
+```
+###### Função de treino do modelo
+A função de perda do VAE é uma composição de duas perdas:
+- Perda de reconstrução: MSE(imagem entrada, imagem reconstruída).
+- Divergência de Kullback-Leibler (KLD): Mede quanto a distribuição de probabilidade predita pelo modelo diverge da distribuição de porbabilidade esperada.
 
-
+```python
 def train(net, trainloader, epochs, learning_rate, device):
     """Train the network on the training set."""
     net.to(device)  # move model to GPU if available
@@ -184,8 +192,9 @@ def train(net, trainloader, epochs, learning_rate, device):
             loss = recon_loss + 0.05 * kld_loss
             loss.backward()
             optimizer.step()
-
-
+```
+##### Função de teste do modelo 
+```python
 def test(net, testloader, device):
     """Validate the network on the entire test set."""
     total, loss = 0, 0.0
@@ -200,8 +209,9 @@ def test(net, testloader, device):
             loss += recon_loss + kld_loss
             total += len(images)
     return loss / total
+```
 
-
+```python
 def generate(net, image):
     """Reproduce the input with trained VAE."""
     with torch.no_grad():
