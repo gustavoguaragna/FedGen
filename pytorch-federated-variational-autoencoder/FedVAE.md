@@ -44,6 +44,7 @@ clientapp = "fedvaeexample.client_app:app"
 num-server-rounds = 3
 local-epochs = 1
 learning-rate = 0.001
+dataset = "mnist"  # Alterar para "cifar10" conforme necessário
 
 [tool.flwr.federations]
 default = "local-simulation"
@@ -81,36 +82,69 @@ class Flatten(nn.Module):
 class UnFlatten(nn.Module):
     """Unflattens a tensor converting it to a desired shape."""
 
+    def __init__(self, target_shape):
+        super().__init__()
+        self.target_shape = target_shape
+
     def forward(self, input):
-        return input.view(-1, 16, 6, 6)
+        return input.view(*self.target_shape)
 
 
 class Net(nn.Module):
-    def __init__(self, h_dim=576, z_dim=10) -> None:
+    def __init__(self, dataset="mnist", z_dim=10) -> None:
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(
-                in_channels=3, out_channels=6, kernel_size=4, stride=2
-            ),  # [batch, 6, 15, 15]
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=6, out_channels=16, kernel_size=5, stride=2
-            ),  # [batch, 16, 6, 6]
-            nn.ReLU(),
-            Flatten(),
-        )
-
-        self.fc1 = nn.Linear(h_dim, z_dim)
-        self.fc2 = nn.Linear(h_dim, z_dim)
-        self.fc3 = nn.Linear(z_dim, h_dim)
-
-        self.decoder = nn.Sequential(
-            UnFlatten(),
-            nn.ConvTranspose2d(in_channels=16, out_channels=6, kernel_size=5, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=6, out_channels=3, kernel_size=4, stride=2),
-            nn.Tanh(),
-        )
+        if dataset == "mnist":
+            in_channels = 1
+            out_channels = 1
+            self.encoder = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=1, out_channels=6, kernel_size=4, stride=2
+                ),  # [batch,6,13,13]
+                nn.ReLU(),
+                nn.Conv2d(
+                    in_channels=6, out_channels=16, kernel_size=5, stride=2
+                ),  # [batch,16,5,5]
+                nn.ReLU(),
+                Flatten(),
+            )
+            h_dim = 16 * 5 * 5  # 400
+            self.fc1 = nn.Linear(h_dim, z_dim)
+            self.fc2 = nn.Linear(h_dim, z_dim)
+            self.fc3 = nn.Linear(z_dim, h_dim)
+            self.decoder = nn.Sequential(
+                UnFlatten((-1, 16, 5, 5)),  # [batch,16,5,5]
+                nn.ConvTranspose2d(in_channels=16, out_channels=6, kernel_size=5, stride=2),  # [batch,6,15,15]
+                nn.ReLU(),
+                nn.ConvTranspose2d(in_channels=6, out_channels=1, kernel_size=4, stride=2),  # [batch,1,28,28]
+                nn.Tanh(),
+            )
+        elif dataset == "cifar10":
+            in_channels = 3
+            out_channels = 3
+            self.encoder = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=3, out_channels=6, kernel_size=4, stride=2
+                ),  # [batch,6,15,15]
+                nn.ReLU(),
+                nn.Conv2d(
+                    in_channels=6, out_channels=16, kernel_size=5, stride=2
+                ),  # [batch,16,6,6]
+                nn.ReLU(),
+                Flatten(),
+            )
+            h_dim = 16 * 6 * 6  # 576
+            self.fc1 = nn.Linear(h_dim, z_dim)
+            self.fc2 = nn.Linear(h_dim, z_dim)
+            self.fc3 = nn.Linear(z_dim, h_dim)
+            self.decoder = nn.Sequential(
+                UnFlatten((-1, 16, 6, 6)),  # [batch,16,6,6]
+                nn.ConvTranspose2d(in_channels=16, out_channels=6, kernel_size=5, stride=2),  # [batch,6,15,15]
+                nn.ReLU(),
+                nn.ConvTranspose2d(in_channels=6, out_channels=3, kernel_size=4, stride=2),  # [batch,3,32,32]
+                nn.Tanh(),
+            )
+        else:
+            raise ValueError(f"Dataset {dataset} not supported")
 
     def reparametrize(self, h):
         """Reparametrization layer of VAE."""
@@ -138,31 +172,47 @@ class Net(nn.Module):
         return z_decode, mu, logvar
 
 ```
-A função _load_data_ é responsável por carregar os dados do CIFAR10, dividí-los entre os clientes e pré-processá-los.
-
+A função _load_data_ é responsável por carregar os dados do CIFAR10 ou MNIST, dividí-los entre os clientes e pré-processá-los.
 ```python
 fds = None  # Cache FederatedDataset
 
-def load_data(partition_id, num_partitions):
-    """Load partition CIFAR10 data."""
-    # Only initialize `FederatedDataset` once
+def load_data(partition_id, num_partitions, dataset="mnist"):
+    """Load partition dataset (MNIST or CIFAR10)."""
+    # Only initialize FederatedDataset once
     global fds
     if fds is None:
         partitioner = IidPartitioner(num_partitions=num_partitions)
-        fds = FederatedDataset(
-            dataset="uoft-cs/cifar10",
-            partitioners={"train": partitioner},
-        )
+        if dataset == "mnist":
+            fds = FederatedDataset(
+                dataset="mnist",
+                partitioners={"train": partitioner},
+            )
+        elif dataset == "cifar10":
+            fds = FederatedDataset(
+                dataset="uoft-cs/cifar10",
+                partitioners={"train": partitioner},
+            )
+        else:
+            raise ValueError(f"Dataset {dataset} not supported")
     partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
     partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-    pytorch_transforms = Compose(
-        [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-    )
+    if dataset == "mnist":
+        pytorch_transforms = Compose(
+            [ToTensor(), Normalize((0.5,), (0.5,))]  # MNIST has 1 channel
+        )
+    elif dataset == "cifar10":
+        pytorch_transforms = Compose(
+            [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]  # CIFAR-10 has 3 channels
+        )
 
-    def apply_transforms(batch):
+    def apply_transforms(batch, dataset="mnist"):
+        if dataset == "mnist":
+          imagem = "image"
+        elif dataset == "cifar10":
+          imagem = "img"
         """Apply transforms to the partition from FederatedDataset."""
-        batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
+        batch[imagem] = [pytorch_transforms(img) for img in batch[imagem]]
         return batch
 
     partition_train_test = partition_train_test.with_transform(apply_transforms)
@@ -176,14 +226,17 @@ A função de perda do VAE é uma composição de duas perdas:
 - Divergência de Kullback-Leibler (KLD): Mede quanto a distribuição de probabilidade predita pelo modelo diverge da distribuição de porbabilidade esperada.
 
 ```python
-def train(net, trainloader, epochs, learning_rate, device):
+def train(net, trainloader, epochs, learning_rate, device, dataset="mnist"):
     """Train the network on the training set."""
+    if dataset == "mnist":
+      imagem = "image"
+    elif dataset == "cifar10":
+      imagem = "img"
     net.to(device)  # move model to GPU if available
     optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
     for _ in range(epochs):
-        # for images, _ in trainloader:
         for batch in trainloader:
-            images = batch["img"]
+            images = batch[imagem]
             images = images.to(device)
             optimizer.zero_grad()
             recon_images, mu, logvar = net(images)
@@ -195,14 +248,16 @@ def train(net, trainloader, epochs, learning_rate, device):
 ```
 ##### Função de teste do modelo 
 ```python
-def test(net, testloader, device):
+def test(net, testloader, device, dataset="mnist"):
     """Validate the network on the entire test set."""
+    if dataset == "mnist":
+      imagem = "image"
+    elif dataset == "cifar10":
+      imagem = "img"
     total, loss = 0, 0.0
     with torch.no_grad():
-        # for data in testloader:
         for batch in testloader:
-            images = batch["img"].to(device)
-            # images = data[0].to(DEVICE)
+            images = batch[imagem].to(device)
             recon_images, mu, logvar = net(images)
             recon_loss = F.mse_loss(recon_images, images)
             kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
@@ -243,14 +298,15 @@ from flwr.common import Context
 ##### Classe do cliente
 O cliente herda a classe _NumpyClient_ do _Flower_ e define seus atributos modelo, _trainloader_, _testloader_, número de épocas locais de treino, _learning rate_ e _device_. Define o método _fit_ que é responsável pelo treinamento do modelo, usando as funções definidas no arquivo _task.py_ _set_weights_, _train_ e _get_weights_, retornando os parâmentros atualizados localmente e o número de amostras para cálculo de agregação do _FedAvg_. O método _evaluate_ utiliza também a função _test_ do arquivo _task.py_ para calcular a função de perda de teste no modelo treinado em um respectivo cliente.
 ```python
-class CifarClient(NumPyClient):
-    def __init__(self, trainloader, testloader, local_epochs, learning_rate):
-        self.net = Net()
+class FedVaeClient(NumPyClient):
+    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset):
+        self.net = Net(dataset=dataset)
         self.trainloader = trainloader
         self.testloader = testloader
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.dataset = dataset
 
     def fit(self, parameters, config):
         """Train the model with data of this client."""
@@ -261,13 +317,14 @@ class CifarClient(NumPyClient):
             epochs=self.local_epochs,
             learning_rate=self.lr,
             device=self.device,
+            dataset=self.dataset
         )
         return get_weights(self.net), len(self.trainloader), {}
 
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
         set_weights(self.net, parameters)
-        loss = test(self.net, self.testloader, self.device)
+        loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
         return float(loss), len(self.testloader), {}
 ```
 A função _client_fn_ é responsável por construir as instâncias de clientes que irão rodar em uma aplicação de cliente. As informações como número de épocas locais e _learning-rate_ são obtidas do arquivo _pyproject.toml_ através do _run_config_.
@@ -281,11 +338,12 @@ def client_fn(context: Context):
     num_partitions = context.node_config["num-partitions"]
 
     # Read the run_config to fetch hyperparameters relevant to this run
-    trainloader, testloader = load_data(partition_id, num_partitions)
+    dataset = context.run_config["dataset"]  # Novo parâmetro
+    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset)
     local_epochs = context.run_config["local-epochs"]
     learning_rate = context.run_config["learning-rate"]
 
-    return CifarClient(trainloader, testloader, local_epochs, learning_rate).to_client()
+    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset).to_client()
 
 
 app = ClientApp(client_fn=client_fn)
@@ -301,7 +359,54 @@ from fedvaeexample.task import Net, get_weights
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.strategy import FedAvg
+import os  # Importar para verificar a existência de arquivos
 ```
+Classe que define uma estratégia tal como o _FedAvg_, mas que salva os pesos do modelo e o valor da função de perda a cada rodada.
+```python
+class FedAvg_Save(FedAvg):
+    def __init__(self, dataset, **kwargs):
+        super().__init__(**kwargs)
+        self.dataset = dataset
+
+    def aggregate_fit(self, server_round, results, failures):
+        # Agrega os resultados da rodada
+        aggregated_parameters, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
+
+        if aggregated_parameters is not None:
+            # Salva o modelo após a agregação
+            self.save_model(aggregated_parameters, server_round)
+
+        return aggregated_parameters, aggregated_metrics
+
+    def aggregate_evaluate(self, server_round, results, failures):
+        # Agrega os resultados da avaliação
+        aggregated_loss, aggregated_metrics = super().aggregate_evaluate(server_round, results, failures)
+
+        # Salva a perda após a avaliação
+        self.save_loss(aggregated_loss, server_round)
+
+        return aggregated_loss, aggregated_metrics
+
+    def save_model(self, parameters, server_round):
+        # Converte os parâmetros para ndarrays
+        ndarrays = parameters_to_ndarrays(parameters)
+        # Cria uma instância do modelo
+        model = Net(dataset=self.dataset)
+        # Define os pesos do modelo
+        set_weights(model, ndarrays)
+        # Salva o modelo no disco com o nome específico do dataset
+        model_path = f"model_round_{server_round}_{self.dataset}.pt"
+        torch.save(model.state_dict(), model_path)
+        print(f"Modelo salvo em {model_path}")
+
+    def save_loss(self, loss, server_round):
+        # Salva a perda em um arquivo de texto específico do dataset
+        loss_file = f"losses_{self.dataset}.txt"
+        with open(loss_file, "a") as f:
+            f.write(f"Rodada {server_round}, Perda: {loss}\n")
+        print(f"Perda da rodada {server_round} salva em {loss_file}")
+```
+
 Função para definir configurações para a execução do servidor como número de rodadas e estratégia de agregação. Os parâmetros iniciais do modelo também são definidos.
 
 ```python
@@ -324,6 +429,15 @@ def server_fn(context: Context) -> ServerAppComponents:
 
 # Create ServerApp
 app = ServerApp(server_fn=server_fn)
+```
+## Resultados
+Para rodar o código nesse esquema, basta inicialmente instalar as dependências com:
+```bash
+pip install -e ./pytorch-federated-variational-autoencoder/
+```
+Então, para rodar:
+```bash
+flwr run ./pytorch-federated-variational-autoencoder/
 ```
 
 
