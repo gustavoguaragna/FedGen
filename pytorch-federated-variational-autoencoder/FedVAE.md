@@ -270,6 +270,7 @@ class CifarClient(NumPyClient):
         loss = test(self.net, self.testloader, self.device)
         return float(loss), len(self.testloader), {}
 ```
+A função _client_fn_ é responsável por construir as instâncias de clientes que irão rodar em uma aplicação de cliente. As informações como número de épocas locais e _learning-rate_ são obtidas do arquivo _pyproject.toml_ através do _run_config_.
 
 ```python
 def client_fn(context: Context):
@@ -292,6 +293,39 @@ app = ClientApp(client_fn=client_fn)
 ```
 
 ## Servidor
+##### Importações
+```python
+"""fedvaeexample: A Flower / PyTorch app for Federated Variational Autoencoder."""
+
+from fedvaeexample.task import Net, get_weights
+from flwr.common import Context, ndarrays_to_parameters
+from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from flwr.server.strategy import FedAvg
+```
+Função para definir configurações para a execução do servidor como número de rodadas e estratégia de agregação. Os parâmetros iniciais do modelo também são definidos.
+
+```python
+def server_fn(context: Context) -> ServerAppComponents:
+    """Construct components for ServerApp."""
+
+    # Read from config
+    num_rounds = context.run_config["num-server-rounds"]
+
+    # Initialize model parameters
+    ndarrays = get_weights(Net())
+    parameters = ndarrays_to_parameters(ndarrays)
+
+    # Define the strategy
+    strategy = FedAvg(initial_parameters=parameters)
+    config = ServerConfig(num_rounds=num_rounds)
+
+    return ServerAppComponents(strategy=strategy, config=config)
+
+
+# Create ServerApp
+app = ServerApp(server_fn=server_fn)
+```
+
 
 
 
