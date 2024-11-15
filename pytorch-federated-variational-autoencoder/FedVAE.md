@@ -54,7 +54,7 @@ options.num-supernodes = 2
 
 ## Funções auxiliares
 
-Importações
+##### Importações
 ```python
 """fedvae: A Flower app for Federated Variational Autoencoder."""
 
@@ -210,6 +210,7 @@ def test(net, testloader, device):
             total += len(images)
     return loss / total
 ```
+A função _generate_ pode ser utilizada para gerar uma imagem sintética a partir de uma imagem real e da VAE treinada. A função _get_weights_ prepara os pesos do modelo para serem transmitidos entre clientes e servidor em forma de lista de arrays numpy. A função _set_weights_ atualiza os parâmetros do modelo com os novos pesos recebidos. 
 
 ```python
 def generate(net, image):
@@ -230,6 +231,7 @@ def set_weights(net, parameters):
 ```
 
 ## Arquivo do cliente
+
 ```python
 """fedvaeexample: A Flower / PyTorch app for Federated Variational Autoencoder."""
 
