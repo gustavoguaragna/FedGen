@@ -439,9 +439,182 @@ Então, para rodar:
 ```bash
 flwr run ./pytorch-federated-variational-autoencoder/
 ```
+Após completar o treinamento, é esperado o seguinte output, contento os valores da função de perda por rodada:
 
+![FL Treino](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/FL_trained.png "Fim de Treinamento")
 
+Esses valores podem ser melhor analisados a partir da um gráfico. Nossa estratégia utilizada no treinamento salvou os valores da função de perda por rodada em um arquivo txt, de modo que esses valores podem ser obtidos a partir do código abaixo:
 
+```python
+import re
+rounds = []
+losses = []
 
+# Define the regex pattern to extract numbers
+pattern = r"Rodada\s+(\d+),\s+Perda:\s+([0-9.]+)"
 
-[GitHub Original](https://github.com/adap/flower/tree/main/examples/pytorch-federated-variational-autoencoder)
+with open(f"losses_{dataset}.txt", 'r') as file:
+    for line in file:
+        line = line.strip()
+        if line:  # Ensure the line is not empty
+            match = re.match(pattern, line)
+            if match:
+                round_num = int(match.group(1))
+                loss_val = float(match.group(2))
+                rounds.append(round_num)
+                losses.append(loss_val)
+            else:
+                print(f"Ignored line (unexpected format): {line}")
+```
+E o gráfico é plotado com o código:
+```python
+plt.figure(figsize=(10, 6))
+plt.plot(rounds, losses, marker='o', linestyle='-', color='b', label='Loss')
+plt.xlabel('Round', fontsize=14)
+plt.ylabel('Loss', fontsize=14)
+plt.grid(True)
+plt.xticks(rounds)  # Set x-ticks to be the round numbers
+plt.legend()
+
+plt.savefig("losses.png")
+plt.show()
+```
+![Loss por Rodada](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/losses.png "Loss por Rodada")
+
+Também podemos analisar visualmente imagens sintéticas geradas pelo nosso VAE a partir de imagens reais.
+Primeiramente, vamos baixar as imagens do banco de dados e normalizar para serem entrada do nosso modelo treinado.
+```python
+from torchvision.datasets import CIFAR10, MNIST
+from torchvision.transforms import Compose, ToTensor, Normalize
+
+# Defina as mesmas transformações usadas durante o treinamento
+if dataset == "mnist":
+    transform = Compose([
+        ToTensor(),
+        Normalize((0.5,), (0.5,))
+    ])
+    dataset_obj = MNIST(root='./data', train=False, download=True, transform=transform)
+elif dataset == "cifar10":
+    transform = Compose([
+        ToTensor(),
+        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    dataset_obj = CIFAR10(root='./data', train=False, download=True, transform=transform)
+else:
+    raise ValueError(f"Dataset {dataset} not supported")
+```
+Agora, vamos buscar imagens do banco de dados, até obter uma imagem de cada classe para fins didáticos. Em seguida, geramos imagens sintéticas a partir das imagens reais selecionadas.
+```python
+num_classes = 10
+images_dict = {}  # Dicionário para armazenar imagens por dígito
+
+for i, (img, label) in enumerate(dataset_obj):
+    if label not in images_dict:
+        images_dict[label] = img
+    if len(images_dict) == num_classes:
+        break
+
+# Verifique se todos os dígitos foram encontrados
+if len(images_dict) < num_classes:
+    raise ValueError("Não foi possível encontrar uma imagem para cada classe.")
+
+# Ordenar as imagens de 0 a 9
+images = [images_dict[classe] for classe in range(num_classes)]
+# Certifique-se de que as imagens estão no dispositivo correto
+images = [img.to(device) for img in images]
+
+# Empilhe as imagens em um único tensor
+input_batch = torch.stack(images)
+
+# Gere as reconstruções usando a função generate
+with torch.no_grad():
+    reconstructed_images, _, _ = fedvae.generate(model, input_batch)
+```
+Então, desnormalizamos as imagens.
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Desnormalize as imagens (inverta a normalização aplicada)
+def denormalize(imgs):
+    imgs = imgs * 0.5 + 0.5  # Escala de volta para [0,1]
+    imgs = torch.clamp(imgs, 0, 1)
+    return imgs
+
+input_batch = denormalize(input_batch.cpu())
+reconstructed_images = denormalize(reconstructed_images.cpu())
+
+# Converter para numpy
+input_batch = input_batch.numpy()
+reconstructed_images = reconstructed_images.numpy()
+```
+Finalmente, podemos gerar uma vizualização, comparando as imagens sintéticas geradas com as reais.
+```python
+# Criar a figura composta
+fig, axes = plt.subplots(nrows=5, ncols=4, figsize=(16, 20))
+fig.suptitle(f"Comparação de Imagens Originais e Reconstruídas ({dataset.upper()})", fontsize=20)
+
+for i in range(5):
+    # Dígitos 0-4 na primeira e segunda colunas
+    orig_idx = i  # Dígito 0-4
+    recon_idx = i
+
+    if dataset == "mnist":
+        orig_img = np.squeeze(input_batch[orig_idx])  # Remover dimensão de canal
+        recon_img = np.squeeze(reconstructed_images[recon_idx])
+        cmap = 'gray'
+    elif dataset == "cifar10":
+        orig_img = np.transpose(input_batch[orig_idx], (1, 2, 0))  # (C, H, W) -> (H, W, C)
+        recon_img = np.transpose(reconstructed_images[recon_idx], (1, 2, 0))
+        cmap = None  # RGB
+
+    # Coluna 1: Original (0-4)
+    ax_orig = axes[i, 0]
+    ax_orig.imshow(orig_img, cmap=cmap)
+    digit_label = f"Dígito {orig_idx}" if dataset == "mnist" else f"Classe {orig_idx}"
+    ax_orig.set_title(f"Original {digit_label}", fontsize=14)
+    ax_orig.axis('off')
+
+    # Coluna 2: Reconstruída (0-4)
+    ax_recon = axes[i, 1]
+    ax_recon.imshow(recon_img, cmap=cmap)
+    ax_recon.set_title(f"Reconstruída {digit_label}", fontsize=14)
+    ax_recon.axis('off')
+
+    # Dígitos 5-9 na terceira e quarta colunas
+    orig_idx_2 = i + 5  # Dígito 5-9
+    recon_idx_2 = i + 5
+
+    if dataset == "mnist":
+        orig_img_2 = np.squeeze(input_batch[orig_idx_2])
+        recon_img_2 = np.squeeze(reconstructed_images[recon_idx_2])
+        cmap_2 = 'gray'
+    elif dataset == "cifar10":
+        orig_img_2 = np.transpose(input_batch[orig_idx_2], (1, 2, 0))
+        recon_img_2 = np.transpose(reconstructed_images[recon_idx_2], (1, 2, 0))
+        cmap_2 = None
+
+    # Coluna 3: Original (5-9)
+    ax_orig_2 = axes[i, 2]
+    ax_orig_2.imshow(orig_img_2, cmap=cmap_2)
+    digit_label_2 = f"Dígito {orig_idx_2}" if dataset == "mnist" else f"Classe {orig_idx_2}"
+    ax_orig_2.set_title(f"Original {digit_label_2}", fontsize=14)
+    ax_orig_2.axis('off')
+
+    # Coluna 4: Reconstruída (5-9)
+    ax_recon_2 = axes[i, 3]
+    ax_recon_2.imshow(recon_img_2, cmap=cmap_2)
+    ax_recon_2.set_title(f"Reconstruída {digit_label_2}", fontsize=14)
+    ax_recon_2.axis('off')
+
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ajusta o layout para não sobrepor o título
+# Salvar a figura
+output_path = f"comparison_{dataset}.png"
+plt.savefig(output_path)
+plt.close()
+
+print(f"Figura comparativa salva em {output_path}")
+```
+![Imagens Geradas](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/comparison_mnist.png "Imagens Sintéticas por Classe")
+
+Aqui está o [GitHub Original](https://github.com/adap/flower/tree/main/examples/pytorch-federated-variational-autoencoder) configurado somente para o CIFAR10 e que não salva os modelos e as perdas por rodada.
