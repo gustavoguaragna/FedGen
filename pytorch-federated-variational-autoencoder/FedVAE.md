@@ -616,7 +616,6 @@ plt.close()
 print(f"Figura comparativa salva em {output_path}")
 ```
 ![Imagens Geradas](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/comparison_mnist.png "Imagens Sintéticas por Classe")
-![Imagens Geradas 2](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/comparison_mnist (1)).png "Imagens Sintéticas por Classe 2")
 
 
 O que também pode ser feito a fim de analisar a qualidade das imagens geradas é treinar um modelo classificador com as imagens reais e treinar o mesmo modelo, mas com as imagens sintéticas e comparar o desempenho.
