@@ -617,4 +617,127 @@ print(f"Figura comparativa salva em {output_path}")
 ```
 ![Imagens Geradas](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/comparison_mnist.png "Imagens Sintéticas por Classe")
 
+O que também pode ser feito a fim de analisar a qualidade das imagens geradas é treinar um modelo classificador com as imagens reais e treinar o mesmo modelo, mas com as imagens sintéticas e comparar o desempenho.
+Vamos então definir um simples modelo com duas camadas convolucionais, seguidas de ativações ReLU e camadas de maxpooling e com duas camadas lineares ao fim. 
+```python
+from torch import nn 
+class SimpleCNN(nn.Module):
+    def __init__(self):
+        super(SimpleCNN, self).__init__()
+        self.conv_layer = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),  # 28x28 -> 28x28
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),                          # 28x28 -> 14x14
+            nn.Conv2d(32, 64, kernel_size=3, padding=1), # 14x14 -> 14x14
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2)                           # 14x14 -> 7x7
+        )
+        self.fc_layer = nn.Sequential(
+            nn.Linear(64 * 7 * 7, 128),
+            nn.ReLU(),
+            nn.Linear(128, 10)  # 10 classes para o MNIST
+        )
+    
+    def forward(self, x):
+        x = self.conv_layer(x)
+        x = x.view(x.size(0), -1)  # Flatten
+        x = self.fc_layer(x)
+        return x
+```
+Vamos aproveitar o MNISt que já tínhamos baixado para treino, mas vamos baixar também a parte de teste e aplicar as mesmas transformações. Além disso, vamos também difidir o banco de dados de treino para acelerar o processo, assim uma metade será usada para treinar o modelo classificador, enquanto a outra será usada como entrada do VAE treinado.
+```python
+from torch.utils.data import DataLoader, Subset
+# Carregar o conjunto de dados de teste
+test_dataset = MNIST(root='./data', train=False, download=True, transform=transform)
+
+# Dividir o conjunto de treinamento em duas metades
+train_size = len(dataset_obj)
+indices = list(range(train_size))
+half_size = train_size // 2
+
+# Primeira metade para imagens reais
+real_train_indices = indices[:half_size]
+real_train_subset = Subset(dataset_obj, real_train_indices)
+
+# Segunda metade para geração de imagens sintéticas
+synthetic_train_indices = indices[half_size:]
+synthetic_train_subset = Subset(dataset_obj, synthetic_train_indices)
+
+# Definir os DataLoaders
+batch_size = 64
+
+real_train_loader = DataLoader(real_train_subset, batch_size=batch_size, shuffle=True)
+synthetic_train_loader = DataLoader(synthetic_train_subset, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+```
+Vamos treinar o modelo por 5 épocas e reportar a acurácia no banco de dados de teste.
+```python
+def train_classifier(model, device, train_loader, optimizer, criterion, epochs=5):
+    model.train()
+    for epoch in range(1, epochs + 1):
+        running_loss = 0.0
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data, target = data.to(device), target.to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(data)
+            loss = criterion(outputs, target)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+        
+        avg_loss = running_loss / len(train_loader)
+        print(f'Epoch {epoch}/{epochs}, Loss: {avg_loss:.6f}')
+
+def evaluate_classifier(model, device, test_loader):
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            outputs = model(data)
+            _, predicted = torch.max(outputs.data, 1)
+            total += target.size(0)
+            correct += (predicted == target).sum().item()
+    accuracy = 100 * correct / total
+    return accuracy
+# Configurar o dispositivo (GPU se disponível)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f'Using device: {device}')
+
+# Instanciar o modelo
+classifier_real = SimpleCNN().to(device)
+
+# Definir o otimizador e a função de perda
+optimizer_real = torch.optim.Adam(classifier_real.parameters(), lr=0.001)
+criterion = nn.CrossEntropyLoss()
+
+# Treinar o classificador com imagens reais
+print("Training classifier with real MNIST images...")
+train_classifier(classifier_real, device, real_train_loader, optimizer_real, criterion, epochs=5)
+
+# Avaliar a acurácia no conjunto de teste
+accuracy_real = evaluate_classifier(classifier_real, device, test_loader)
+print(f'Acurácia do classificador treinado com imagens reais: {accuracy_real:.2f}%')
+```
+![Treino MNIST real](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/treino_mnist_real.png "Treino MNIST real")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Aqui está o [GitHub Original](https://github.com/adap/flower/tree/main/examples/pytorch-federated-variational-autoencoder) configurado somente para o CIFAR10 e que não salva os modelos e as perdas por rodada.
