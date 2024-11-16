@@ -479,7 +479,7 @@ plt.legend()
 plt.savefig("losses.png")
 plt.show()
 ```
-![Loss por Rodada](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/losses.png "Loss por Rodada")
+![Loss por Rodada](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/losses_50.png "Loss por Rodada")
 
 Também podemos analisar visualmente imagens sintéticas geradas pelo nosso VAE a partir de imagens reais.
 Primeiramente, vamos baixar as imagens do banco de dados e normalizar para serem entrada do nosso modelo treinado.
@@ -616,6 +616,8 @@ plt.close()
 print(f"Figura comparativa salva em {output_path}")
 ```
 ![Imagens Geradas](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/comparison_mnist.png "Imagens Sintéticas por Classe")
+![Imagens Geradas 2](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/comparison_mnist (1).png "Imagens Sintéticas por Classe 2")
+
 
 O que também pode ser feito a fim de analisar a qualidade das imagens geradas é treinar um modelo classificador com as imagens reais e treinar o mesmo modelo, mas com as imagens sintéticas e comparar o desempenho.
 Vamos então definir um simples modelo com duas camadas convolucionais, seguidas de ativações ReLU e camadas de maxpooling e com duas camadas lineares ao fim. 
