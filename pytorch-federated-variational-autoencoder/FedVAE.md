@@ -724,21 +724,48 @@ accuracy_real = evaluate_classifier(classifier_real, device, test_loader)
 print(f'Acurácia do classificador treinado com imagens reais: {accuracy_real:.2f}%')
 ```
 ![Treino MNIST real](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/treino_mnist_real.png "Treino MNIST real")
+Agora, vamos gerar dados sintéticos usando o VAE treinado e a outra metade dos dados do MNIST.
+```python
+synthetic_images = []
+with torch.no_grad():
+  for img, _ in synthetic_train_loader:
+    image = img.to(device)
+    recon, _, _ = fedvae.generate(model, image)
+    synthetic_images.append(recon.cpu())
+    if len(synthetic_images) * img.size(0) >= len(synthetic_train_subset):
+                break
+synthetic_images = torch.cat(synthetic_images, dim=0)[:len(synthetic_train_subset)]
 
+from torch.utils.data import TensorDataset
 
+# Criar o Dataset com as imagens sintéticas e os respectivos rótulos
+# Assumindo que queremos usar os mesmos rótulos das imagens reais
+# Extraindo os rótulos da segunda metade do conjunto de treinamento
+_, synthetic_labels = zip(*synthetic_train_subset)
+synthetic_labels = torch.tensor(synthetic_labels)
 
+synthetic_dataset = TensorDataset(synthetic_images, synthetic_labels)
+synthetic_train_loader_new = DataLoader(synthetic_dataset, batch_size=batch_size, shuffle=True)
+```
+Por último, treinamos o mesmo modelo anterior, mas agora com os dados sintéticos.
+```python
+# Instanciar um novo classificador para imagens sintéticas
+classifier_synthetic = SimpleCNN().to(device)
 
+# Definir o otimizador e a função de perda
+optimizer_synthetic = torch.optim.Adam(classifier_synthetic.parameters(), lr=0.001)
+criterion = nn.CrossEntropyLoss()
 
+# Treinar o classificador com imagens sintéticas
+print("\nTraining classifier with synthetic MNIST images...")
+train_classifier(classifier_synthetic, device, synthetic_train_loader_new, optimizer_synthetic, criterion, epochs=5)
 
+# Avaliar a acurácia no conjunto de teste
+accuracy_synthetic = evaluate_classifier(classifier_synthetic, device, test_loader)
+print(f'Acurácia do classificador treinado com imagens sintéticas: {accuracy_synthetic:.2f}%')
+```
+![Treino MNIST fake](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/treino_mnist_fake.png "Treino MNIST fake")
 
-
-
-
-
-
-
-
-
-
+Podemos notar que a acurácia nesse caso foi de fato menor do que quando treinado com dados reais, mas não foi de todo mal, atingindo 90% de acurácia.
 
 Aqui está o [GitHub Original](https://github.com/adap/flower/tree/main/examples/pytorch-federated-variational-autoencoder) configurado somente para o CIFAR10 e que não salva os modelos e as perdas por rodada.
