@@ -206,7 +206,7 @@ def load_data(partition_id, num_partitions, dataset="mnist"):
             [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]  # CIFAR-10 has 3 channels
         )
 
-    def apply_transforms(batch, dataset="mnist"):
+    def apply_transforms(batch, dataset=dataset):
         if dataset == "mnist":
           imagem = "image"
         elif dataset == "cifar10":
