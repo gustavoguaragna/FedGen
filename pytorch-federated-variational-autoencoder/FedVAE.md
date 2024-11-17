@@ -677,7 +677,7 @@ def train_classifier(model, device, train_loader, optimizer, criterion, epochs=5
     model.train()
     for epoch in range(1, epochs + 1):
         running_loss = 0.0
-        for batch_idx, (data, target) in enumerate(train_loader):
+        for data, target in train_loader:
             data, target = data.to(device), target.to(device)
             
             optimizer.zero_grad()
