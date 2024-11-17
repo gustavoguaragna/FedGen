@@ -413,18 +413,32 @@ Função para definir configurações para a execução do servidor como número
 def server_fn(context: Context) -> ServerAppComponents:
     """Construct components for ServerApp."""
 
-    # Read from config
+    # Lê a configuração
     num_rounds = context.run_config["num-server-rounds"]
+    dataset = context.run_config["dataset"]  # Novo parâmetro
 
-    # Initialize model parameters
-    ndarrays = get_weights(Net())
+    # Define o caminho do checkpoint inicial (opcional)
+    initial_model_path = f"model_round_0_{dataset}.pt"  # Ajuste conforme necessário
+
+    if os.path.exists(initial_model_path):
+        # Carrega o modelo existente
+        model = Net(dataset=dataset)
+        model.load_state_dict(torch.load(initial_model_path))
+        ndarrays = get_weights(model)
+        print(f"Modelo carregado a partir de {initial_model_path}")
+    else:
+        # Inicializa o modelo a partir do início
+        ndarrays = get_weights(Net(dataset=dataset))
+        print(f"Inicializando modelo do zero para dataset {dataset}")
+
     parameters = ndarrays_to_parameters(ndarrays)
 
-    # Define the strategy
-    strategy = FedAvg(initial_parameters=parameters)
+    # Define a estratégia usando a estratégia personalizada
+    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset)
     config = ServerConfig(num_rounds=num_rounds)
 
     return ServerAppComponents(strategy=strategy, config=config)
+
 
 
 # Create ServerApp
