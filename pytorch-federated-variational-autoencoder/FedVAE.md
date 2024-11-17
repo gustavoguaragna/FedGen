@@ -659,7 +659,7 @@ class SimpleCNN(nn.Module):
         x = self.fc_layer(x)
         return x
 ```
-Vamos aproveitar o MNISt que já tínhamos baixado para treino, mas vamos baixar também a parte de teste e aplicar as mesmas transformações. Além disso, vamos também difidir o banco de dados de treino para acelerar o processo, assim uma metade será usada para treinar o modelo classificador, enquanto a outra será usada como entrada do VAE treinado.
+Vamos aproveitar o MNIST que já tínhamos baixado para treino, mas vamos baixar também a parte de teste e aplicar as mesmas transformações. Além disso, vamos também difidir o banco de dados de treino para acelerar o processo, assim uma metade será usada para treinar o modelo classificador, enquanto a outra será usada como entrada do VAE treinado.
 ```python
 from torch.utils.data import DataLoader, Subset
 # Carregar o conjunto de dados de teste
@@ -778,7 +778,7 @@ train_classifier(classifier_synthetic, device, synthetic_train_loader_new, optim
 accuracy_synthetic = evaluate_classifier(classifier_synthetic, device, test_loader)
 print(f'Acurácia do classificador treinado com imagens sintéticas: {accuracy_synthetic:.2f}%')
 ```
-![Treino MNIST fake](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/treino_mnist_fake.png "Treino MNIST fake")
+![Treino MNIST fake](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/Treino_mnist_fake.png "Treino MNIST fake")
 
 Podemos notar que a acurácia nesse caso foi de fato menor do que quando treinado com dados reais, mas não foi de todo mal, atingindo 90% de acurácia.
 
