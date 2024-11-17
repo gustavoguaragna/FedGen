@@ -738,6 +738,7 @@ accuracy_real = evaluate_classifier(classifier_real, device, test_loader)
 print(f'Acurácia do classificador treinado com imagens reais: {accuracy_real:.2f}%')
 ```
 ![Treino MNIST real](https://github.com/gustavoguaragna/FedGen/blob/main/pytorch-federated-variational-autoencoder/images/treino_mnist_real.png "Treino MNIST real")
+
 Agora, vamos gerar dados sintéticos usando o VAE treinado e a outra metade dos dados do MNIST.
 ```python
 synthetic_images = []
