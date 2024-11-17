@@ -741,7 +741,6 @@ print(f'Acurácia do classificador treinado com imagens reais: {accuracy_real:.2
 
 Agora, vamos gerar dados sintéticos usando o VAE treinado e a outra metade dos dados do MNIST.
 ```python
-import torch
 import importlib
 
 fedvae = importlib.import_module("pytorch-federated-variational-autoencoder.fedvaeexample.task")
