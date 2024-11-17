@@ -519,6 +519,13 @@ else:
 ```
 Agora, vamos buscar imagens do banco de dados, até obter uma imagem de cada classe para fins didáticos. Em seguida, geramos imagens sintéticas a partir das imagens reais selecionadas.
 ```python
+import torch
+import importlib
+
+fedvae = importlib.import_module("pytorch-federated-variational-autoencoder.fedvaeexample.task")
+dataset = "cifar10"
+Net = fedvae.Net(dataset)
+
 num_classes = 10
 images_dict = {}  # Dicionário para armazenar imagens por dígito
 
