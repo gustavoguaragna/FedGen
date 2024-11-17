@@ -223,7 +223,7 @@ def load_data(partition_id, num_partitions, dataset="mnist"):
 ###### Função de treino do modelo
 A função de perda do VAE é uma composição de duas perdas:
 - Perda de reconstrução: MSE(imagem entrada, imagem reconstruída).
-- Divergência de Kullback-Leibler (KLD): Mede quanto a distribuição de probabilidade predita pelo modelo diverge da distribuição de porbabilidade esperada.
+- Divergência de Kullback-Leibler (KLD): Mede quanto a distribuição de probabilidade predita pelo modelo diverge da distribuição de probabilidade esperada.
 
 ```python
 def train(net, trainloader, epochs, learning_rate, device, dataset="mnist"):
