@@ -519,13 +519,6 @@ else:
 ```
 Agora, vamos buscar imagens do banco de dados, até obter uma imagem de cada classe para fins didáticos. Em seguida, geramos imagens sintéticas a partir das imagens reais selecionadas.
 ```python
-import torch
-import importlib
-
-fedvae = importlib.import_module("pytorch-federated-variational-autoencoder.fedvaeexample.task")
-dataset = "cifar10"
-Net = fedvae.Net(dataset)
-
 num_classes = 10
 images_dict = {}  # Dicionário para armazenar imagens por dígito
 
@@ -748,6 +741,17 @@ print(f'Acurácia do classificador treinado com imagens reais: {accuracy_real:.2
 
 Agora, vamos gerar dados sintéticos usando o VAE treinado e a outra metade dos dados do MNIST.
 ```python
+import torch
+import importlib
+
+fedvae = importlib.import_module("pytorch-federated-variational-autoencoder.fedvaeexample.task")
+dataset = "mnist"
+Net = fedvae.Net(dataset)
+model = Net
+model.load_state_dict(torch.load(f"model_round_50_{dataset}.pt"))
+model.to(device)
+model.eval()
+
 synthetic_images = []
 with torch.no_grad():
   for img, _ in synthetic_train_loader:
