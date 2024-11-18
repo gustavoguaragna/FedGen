@@ -541,6 +541,8 @@ images = [img.to(device) for img in images]
 input_batch = torch.stack(images)
 
 # Gere as reconstruções usando a função generate
+import importlib
+fedvae = importlib.import_module("pytorch-federated-variational-autoencoder.fedvaeexample.task")
 with torch.no_grad():
     reconstructed_images, _, _ = fedvae.generate(model, input_batch)
 ```
@@ -741,9 +743,6 @@ print(f'Acurácia do classificador treinado com imagens reais: {accuracy_real:.2
 
 Agora, vamos gerar dados sintéticos usando o VAE treinado e a outra metade dos dados do MNIST.
 ```python
-import importlib
-
-fedvae = importlib.import_module("pytorch-federated-variational-autoencoder.fedvaeexample.task")
 dataset = "mnist"
 Net = fedvae.Net(dataset)
 model = Net
