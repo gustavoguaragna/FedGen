@@ -794,3 +794,4 @@ print(f'Acurácia do classificador treinado com imagens sintéticas: {accuracy_s
 Podemos notar que a acurácia nesse caso foi de fato menor do que quando treinado com dados reais, mas não foi de todo mal, atingindo 90% de acurácia.
 
 Aqui está o [GitHub Original](https://github.com/adap/flower/tree/main/examples/pytorch-federated-variational-autoencoder) configurado somente para o CIFAR10 e que não salva os modelos e as perdas por rodada.
+[Fonte da imagem da estrutura do VAE](https://medium.com/@rushikesh.shende/autoencoders-variational-autoencoders-vae-and-%CE%B2-vae-ceba9998773d)
